@@ -24,6 +24,7 @@ import * as Nouns from "./nouns";
 import * as Okex from "./okex";
 import * as Quixotic from "./quixotic";
 import * as Rarible from "./rarible";
+import * as NFTEarth from "./nftearth";
 import * as Seaport from "./seaport";
 import * as Sudoswap from "./sudoswap";
 import * as SuperRare from "./superrare";
@@ -64,6 +65,7 @@ export {
   Okex,
   Quixotic,
   Rarible,
+  NFTEarth,
   Seaport,
   Sudoswap,
   SuperRare,

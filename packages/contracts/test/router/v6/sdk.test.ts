@@ -1,6 +1,6 @@
 import { Contract } from "@ethersproject/contracts";
 import { parseEther, parseUnits } from "@ethersproject/units";
-import * as Sdk from "@reservoir0x/sdk/src";
+import * as Sdk from "@nftearth/sdk/src";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -13,11 +13,11 @@ import {
   setupNFTs,
   setupRouterWithModules,
 } from "../../utils";
-import * as SeaportPermit from "@reservoir0x/sdk/src/router/v6/permits/seaport";
+import * as SeaportPermit from "@nftearth/sdk/src/router/v6/permits/seaport";
 import {
   BidDetails,
   ListingDetails,
-} from "@reservoir0x/sdk/src/router/v6/types";
+} from "@nftearth/sdk/src/router/v6/types";
 
 describe("[ReservoirV6_0_0] Filling listings and bids via the SDK", () => {
   const chainId = getChainId();
