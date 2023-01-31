@@ -36,4 +36,4 @@ test*.ts
 
 # OpenZeppelin
 unknown-*
-.idea
+.idea/

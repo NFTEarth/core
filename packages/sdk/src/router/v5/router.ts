@@ -108,18 +108,18 @@ export class Router {
       details
         .filter(({ kind }) => kind === "seaport-partial")
         .map(async (detail) => {
-          const order = detail.order as Sdk.Seaport.Types.PartialOrder;
+          const order = detail.order as Sdk.NFTEarth.Types.PartialOrder;
           const result = await axios.get(
             `https://order-fetcher.vercel.app/api/listing?orderHash=${order.id}&contract=${order.contract}&tokenId=${order.tokenId}&taker=${taker}&chainId=${this.chainId}`
           );
 
-          const fullOrder = new Sdk.Seaport.Order(
+          const fullOrder = new Sdk.NFTEarth.Order(
             this.chainId,
             result.data.order
           );
           details.push({
             ...detail,
-            kind: "seaport",
+            kind: "nftearth",
             order: fullOrder,
           });
         })
@@ -133,15 +133,15 @@ export class Router {
     // at the moment because the router has separate functions for
     // filling ERC721 vs ERC1155).
     if (
-      details.every(({ kind }) => kind === "seaport") &&
+      details.every(({ kind }) => kind === "nftearth") &&
       // TODO: Look into using tips for fees on top (only doable on Seaport)
       (!options?.fee || Number(options.fee.bps) === 0) &&
       // Skip direct filling if disabled via the options
       !options?.forceRouter
     ) {
-      const exchange = new Sdk.Seaport.Exchange(this.chainId);
+      const exchange = new Sdk.NFTEarth.Exchange(this.chainId);
       if (details.length === 1) {
-        const order = details[0].order as Sdk.Seaport.Order;
+        const order = details[0].order as Sdk.NFTEarth.Order;
         return exchange.fillOrderTx(
           taker,
           order,
@@ -152,7 +152,7 @@ export class Router {
           }
         );
       } else {
-        const orders = details.map((d) => d.order as Sdk.Seaport.Order);
+        const orders = details.map((d) => d.order as Sdk.NFTEarth.Order);
         return exchange.fillOrdersTx(
           taker,
           orders,

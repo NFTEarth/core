@@ -2,6 +2,9 @@
   "name": "@nftearth/core",
   "private": true,
   "packageManager": "yarn@3.1.1",
+  "scripts": {
+    "publish": "yarn workspaces foreach --no-private --exclude core --exclude demo npm publish --tolerate-republish --access public"
+  },
   "workspaces": [
     "packages/*"
   ],

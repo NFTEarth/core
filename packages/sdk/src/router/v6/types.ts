@@ -23,7 +23,7 @@ export type NFTApproval = {
 export type NFTPermit = {
   tokens: Token[];
   details: {
-    kind: "seaport";
+    kind: "nftearth";
     data: SeaportPermit.Data;
   };
 };
@@ -60,6 +60,10 @@ export type GenericOrder =
       kind: "zeroex-v4";
       order: Sdk.ZeroExV4.Order;
     }
+  | {
+    kind: "nftearth";
+    order: Sdk.NFTEarth.Order;
+  }
   | {
       kind: "seaport";
       order: Sdk.Seaport.Order;

@@ -80,6 +80,11 @@ export class Router {
         LooksRareModuleAbi,
         provider
       ),
+      nftEarthModule: new Contract(
+        Addresses.NFTEarthModule[chainId] ?? AddressZero,
+        SeaportModuleAbi,
+        provider
+      ),
       seaportModule: new Contract(
         Addresses.SeaportModule[chainId] ?? AddressZero,
         SeaportModuleAbi,
@@ -352,6 +357,52 @@ export class Router {
 
     const relayer = options?.relayer ?? taker;
 
+    if (
+      details.every(
+        ({ kind, fees, currency }) =>
+          kind === "nftearth" &&
+          currency === details[0].currency &&
+          buyInCurrency === currency &&
+          !fees?.length
+      ) &&
+      !options?.globalFees?.length &&
+      !options?.forceRouter &&
+      !options?.relayer
+    ) {
+      const exchange = new Sdk.NFTEarth.Exchange(this.chainId);
+      if (details.length === 1) {
+        const order = details[0].order as Sdk.NFTEarth.Order;
+        return {
+          txData: await exchange.fillOrderTx(
+            taker,
+            order,
+            order.buildMatching({ amount: details[0].amount }),
+            {
+              ...options,
+              ...options?.directFillingData,
+            }
+          ),
+          success: [true],
+        };
+      } else {
+        const orders = details.map((d) => d.order as Sdk.NFTEarth.Order);
+        return {
+          txData: await exchange.fillOrdersTx(
+            taker,
+            orders,
+            orders.map((order, i) =>
+              order.buildMatching({ amount: details[i].amount })
+            ),
+            {
+              ...options,
+              ...options?.directFillingData,
+            }
+          ),
+          success: orders.map((_) => true),
+        };
+      }
+    }
+
     // If all orders are Seaport, then fill on Seaport directly
     // TODO: Directly fill for other exchanges as well
     if (
@@ -445,6 +496,7 @@ export class Router {
     const foundationDetails: ListingDetailsExtracted[] = [];
     const looksRareDetails: ListingDetailsExtracted[] = [];
     const seaportDetails: PerCurrencyDetails = {};
+    const nftEarthDetails: PerCurrencyDetails = {};
     const sudoswapDetails: ListingDetailsExtracted[] = [];
     const x2y2Details: ListingDetailsExtracted[] = [];
     const zeroexV4Erc721Details: ListingDetailsExtracted[] = [];
@@ -476,6 +528,13 @@ export class Router {
 
         case "looks-rare":
           detailsRef = looksRareDetails;
+          break;
+
+        case "nftearth":
+          if (!nftEarthDetails[currency]) {
+            nftEarthDetails[currency] = [];
+          }
+          detailsRef = nftEarthDetails[currency];
           break;
 
         case "seaport":
@@ -846,12 +905,14 @@ export class Router {
     }
 
     // Handle Seaport listings
-    if (Object.keys(seaportDetails).length) {
-      const exchange = new Sdk.Seaport.Exchange(this.chainId);
-      for (const currency of Object.keys(seaportDetails)) {
-        const currencyDetails = seaportDetails[currency];
 
-        const orders = currencyDetails.map((d) => d.order as Sdk.Seaport.Order);
+
+    if (Object.keys(nftEarthDetails).length) {
+      const exchange = new Sdk.NFTEarth.Exchange(this.chainId);
+      for (const currency of Object.keys(nftEarthDetails)) {
+        const currencyDetails = nftEarthDetails[currency];
+
+        const orders = currencyDetails.map((d) => d.order as Sdk.NFTEarth.Order);
         const fees = getFees(currencyDetails);
 
         const totalPrice = orders
@@ -903,68 +964,68 @@ export class Router {
             data:
               orders.length === 1
                 ? this.contracts.seaportModule.interface.encodeFunctionData(
-                    `accept${currencyIsETH ? "ETH" : "ERC20"}Listing`,
-                    [
-                      {
-                        parameters: {
-                          ...orders[0].params,
-                          totalOriginalConsiderationItems:
-                            orders[0].params.consideration.length,
-                        },
-                        numerator: currencyDetails[0].amount ?? 1,
-                        denominator: orders[0].getInfo()!.amount,
-                        signature: orders[0].params.signature,
-                        extraData: await exchange.getExtraData(orders[0]),
-                      },
-                      {
-                        fillTo: taker,
-                        refundTo: taker,
-                        revertIfIncomplete: Boolean(!options?.partial),
-                        // Only needed for ERC20 listings
-                        token: currency,
-                        amount: totalPrice,
-                      },
-                      fees,
-                    ]
-                  )
+                `accept${currencyIsETH ? "ETH" : "ERC20"}Listing`,
+                [
+                  {
+                    parameters: {
+                      ...orders[0].params,
+                      totalOriginalConsiderationItems:
+                      orders[0].params.consideration.length,
+                    },
+                    numerator: currencyDetails[0].amount ?? 1,
+                    denominator: orders[0].getInfo()!.amount,
+                    signature: orders[0].params.signature,
+                    extraData: await exchange.getExtraData(orders[0]),
+                  },
+                  {
+                    fillTo: taker,
+                    refundTo: taker,
+                    revertIfIncomplete: Boolean(!options?.partial),
+                    // Only needed for ERC20 listings
+                    token: currency,
+                    amount: totalPrice,
+                  },
+                  fees,
+                ]
+                )
                 : this.contracts.seaportModule.interface.encodeFunctionData(
-                    `accept${currencyIsETH ? "ETH" : "ERC20"}Listings`,
-                    [
-                      await Promise.all(
-                        orders.map(async (order, i) => {
-                          const orderData = {
-                            parameters: {
-                              ...order.params,
-                              totalOriginalConsiderationItems:
-                                order.params.consideration.length,
-                            },
-                            numerator: currencyDetails[i].amount ?? 1,
-                            denominator: order.getInfo()!.amount,
-                            signature: order.params.signature,
-                            extraData: await exchange.getExtraData(order),
-                          };
+                `accept${currencyIsETH ? "ETH" : "ERC20"}Listings`,
+                [
+                  await Promise.all(
+                    orders.map(async (order, i) => {
+                      const orderData = {
+                        parameters: {
+                          ...order.params,
+                          totalOriginalConsiderationItems:
+                          order.params.consideration.length,
+                        },
+                        numerator: currencyDetails[i].amount ?? 1,
+                        denominator: order.getInfo()!.amount,
+                        signature: order.params.signature,
+                        extraData: await exchange.getExtraData(order),
+                      };
 
-                          if (currencyIsETH) {
-                            return {
-                              order: orderData,
-                              price: orders[i].getMatchingPrice(),
-                            };
-                          } else {
-                            return orderData;
-                          }
-                        })
-                      ),
-                      {
-                        fillTo: taker,
-                        refundTo: taker,
-                        revertIfIncomplete: Boolean(!options?.partial),
-                        // Only needed for ERC20 listings
-                        token: currency,
-                        amount: totalPrice,
-                      },
-                      fees,
-                    ]
+                      if (currencyIsETH) {
+                        return {
+                          order: orderData,
+                          price: orders[i].getMatchingPrice(),
+                        };
+                      } else {
+                        return orderData;
+                      }
+                    })
                   ),
+                  {
+                    fillTo: taker,
+                    refundTo: taker,
+                    revertIfIncomplete: Boolean(!options?.partial),
+                    // Only needed for ERC20 listings
+                    token: currency,
+                    amount: totalPrice,
+                  },
+                  fees,
+                ]
+                ),
             value: currencyIsETH ? totalPayment : 0,
           });
 
@@ -1659,7 +1720,7 @@ export class Router {
 
       const contract = detail.contract;
       const owner = taker;
-      const operator = Sdk.Seaport.Addresses.OpenseaConduit[this.chainId];
+      const operator = Sdk.NFTEarth.Addresses.SeaportConduit[this.chainId];
 
       // Generate approval
       approvals.push({
@@ -1674,6 +1735,11 @@ export class Router {
       switch (detail.kind) {
         case "looks-rare": {
           module = this.contracts.looksRareModule;
+          break;
+        }
+
+        case "nftearth": {
+          module = this.contracts.nftEarthModule;
           break;
         }
 
@@ -1756,6 +1822,52 @@ export class Router {
               [
                 matchParams,
                 order.params,
+                {
+                  fillTo: taker,
+                  refundTo: taker,
+                  revertIfIncomplete: Boolean(!options?.partial),
+                },
+                detail.fees ?? [],
+              ]
+            ),
+            value: 0,
+          });
+
+          success[i] = true;
+
+          break;
+        }
+
+        case "nftearth": {
+          const order = detail.order as Sdk.NFTEarth.Order;
+          const module = this.contracts.nftEarthModule;
+
+          const matchParams = order.buildMatching({
+            tokenId: detail.tokenId,
+            amount: detail.amount ?? 1,
+            ...(detail.extraArgs ?? {}),
+          });
+
+          const exchange = new Sdk.NFTEarth.Exchange(this.chainId);
+          executions.push({
+            module: module.address,
+            data: module.interface.encodeFunctionData(
+              detail.contractKind === "erc721"
+                ? "acceptERC721Offer"
+                : "acceptERC1155Offer",
+              [
+                {
+                  parameters: {
+                    ...order.params,
+                    totalOriginalConsiderationItems:
+                    order.params.consideration.length,
+                  },
+                  numerator: matchParams.amount ?? 1,
+                  denominator: order.getInfo()!.amount,
+                  signature: order.params.signature,
+                  extraData: await exchange.getExtraData(order),
+                },
+                matchParams.criteriaResolvers ?? [],
                 {
                   fillTo: taker,
                   refundTo: taker,
@@ -2165,7 +2277,7 @@ export class Router {
             {
               tokens: items.map((i) => i.token),
               details: {
-                kind: "seaport",
+                kind: "nftearth",
                 data: await new SeaportPermit.Handler(
                   this.chainId,
                   this.provider
