@@ -24,7 +24,7 @@ contract SeaportModule is BaseExchangeModule {
     // --- Fields ---
 
     ISeaport public constant EXCHANGE =
-        ISeaport(0x00000000006c3852cbEf3e08E8dF289169EdE581);
+        ISeaport(0x0f9b80fc3c8b9123D0aEf43Df58ebDBC034A8901);
 
     // --- Constructor ---
 
