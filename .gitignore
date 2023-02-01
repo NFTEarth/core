@@ -1,8 +1,11 @@
 # Dependencies
 node_modules
+.idea/
+.yarn/
 
 # Secrets
 .env
+
 
 # Typescript
 dist

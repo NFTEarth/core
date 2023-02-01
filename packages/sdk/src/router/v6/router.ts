@@ -6,6 +6,7 @@ import axios from "axios";
 
 import * as Addresses from "./addresses";
 import * as SeaportPermit from "./permits/seaport";
+import * as NFTEarthPermit from "./permits/nftearth";
 import {
   BidDetails,
   ExecutionInfo,
@@ -327,6 +328,34 @@ export class Router {
     // - remove any partial order from the details
     await Promise.all(
       details
+        .filter(({ kind }) => kind === "nftearth-partial")
+        .map(async (detail) => {
+          try {
+            const order = detail.order as Sdk.NFTEarth.Types.PartialOrder;
+            const result = await axios.get(
+              `https://order-fetcher.vercel.app/api/listing?orderHash=${order.id}&contract=${order.contract}&tokenId=${order.tokenId}&taker=${taker}&chainId=${this.chainId}`
+            );
+
+            const fullOrder = new Sdk.NFTEarth.Order(
+              this.chainId,
+              result.data.order
+            );
+            details.push({
+              ...detail,
+              kind: "nftearth",
+              order: fullOrder,
+            });
+          } catch {
+            if (!options?.partial) {
+              throw new Error("Could not generate fill data");
+            } else {
+              return;
+            }
+          }
+        })
+    );
+    await Promise.all(
+      details
         .filter(({ kind }) => kind === "seaport-partial")
         .map(async (detail) => {
           try {
@@ -353,7 +382,7 @@ export class Router {
           }
         })
     );
-    details = details.filter(({ kind }) => kind !== "seaport-partial");
+    details = details.filter(({ kind }) => kind !== "seaport-partial" && kind !== "nftearth-partial");
 
     const relayer = options?.relayer ?? taker;
 
@@ -1713,14 +1742,14 @@ export class Router {
     const approvals: NFTApproval[] = [];
 
     // Keep track of the tokens needed by each module
-    const permitItems: SeaportPermit.Item[] = [];
+    const permitItems: (SeaportPermit.Item | NFTEarthPermit.Item)[] = [];
 
     for (let i = 0; i < details.length; i++) {
       const detail = details[i];
 
       const contract = detail.contract;
       const owner = taker;
-      const operator = Sdk.NFTEarth.Addresses.SeaportConduit[this.chainId];
+      const operator = Sdk.NFTEarth.Addresses.NFTEarthConduit[this.chainId];
 
       // Generate approval
       approvals.push({
@@ -1738,7 +1767,8 @@ export class Router {
           break;
         }
 
-        case "nftearth": {
+        case "nftearth":
+        case "nftearth-partial": {
           module = this.contracts.nftEarthModule;
           break;
         }
@@ -1880,6 +1910,64 @@ export class Router {
           });
 
           success[i] = true;
+
+          break;
+        }
+
+        case "nftearth-partial": {
+          const order = detail.order as Sdk.NFTEarth.Types.PartialOrder;
+          const module = this.contracts.nftEarthModule;
+
+          try {
+            const result = await axios.get(
+              `https://order-fetcher.vercel.app/api/offer?orderHash=${order.id}&contract=${order.contract}&tokenId=${order.tokenId}&taker=${taker}&chainId=${this.chainId}` +
+              (order.unitPrice ? `&unitPrice=${order.unitPrice}` : "")
+            );
+
+            const fullOrder = new Sdk.NFTEarth.Order(
+              this.chainId,
+              result.data.order
+            );
+
+            const exchange = new Sdk.NFTEarth.Exchange(this.chainId);
+            executions.push({
+              module: module.address,
+              data: module.interface.encodeFunctionData(
+                detail.contractKind === "erc721"
+                  ? "acceptERC721Offer"
+                  : "acceptERC1155Offer",
+                [
+                  {
+                    parameters: {
+                      ...fullOrder.params,
+                      totalOriginalConsiderationItems:
+                      fullOrder.params.consideration.length,
+                    },
+                    numerator: detail.amount ?? 1,
+                    denominator: fullOrder.getInfo()!.amount,
+                    signature: fullOrder.params.signature,
+                    extraData: await exchange.getExtraData(fullOrder),
+                  },
+                  result.data.criteriaResolvers ?? [],
+                  {
+                    fillTo: taker,
+                    refundTo: taker,
+                    revertIfIncomplete: Boolean(!options?.partial),
+                  },
+                  detail.fees ?? [],
+                ]
+              ),
+              value: 0,
+            });
+
+            success[i] = true;
+          } catch {
+            if (!options?.partial) {
+              throw new Error("Could not generate fill data");
+            } else {
+              continue;
+            }
+          }
 
           break;
         }

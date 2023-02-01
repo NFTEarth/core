@@ -3,6 +3,7 @@ import { BigNumberish } from "@ethersproject/bignumber";
 import * as Sdk from "../../index";
 import { TxData } from "../../utils";
 import * as SeaportPermit from "@nftearth/sdk/src/router/v6/permits/seaport";
+import * as NFTEarthPermit from "@nftearth/sdk/src/router/v6/permits/nftearth";
 
 export type Token = {
   kind: "erc721" | "erc1155";
@@ -20,13 +21,23 @@ export type NFTApproval = {
   txData: TxData;
 };
 
-export type NFTPermit = {
+export type SeaportNFTPermit = {
   tokens: Token[];
   details: {
-    kind: "nftearth";
+    kind: "seaport";
     data: SeaportPermit.Data;
   };
 };
+
+export type NFTEarthNFTPermit = {
+  tokens: Token[];
+  details: {
+    kind: "nftearth";
+    data: NFTEarthPermit.Data;
+  };
+};
+
+export type NFTPermit = SeaportNFTPermit | NFTEarthNFTPermit;
 
 // Misc
 
@@ -63,6 +74,10 @@ export type GenericOrder =
   | {
     kind: "nftearth";
     order: Sdk.NFTEarth.Order;
+  }
+  | {
+    kind: "nftearth-partial";
+    order: Sdk.NFTEarth.Types.PartialOrder;
   }
   | {
       kind: "seaport";

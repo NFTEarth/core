@@ -45,12 +45,12 @@ export const OpenseaConduitKey: ChainIdToAddress = {
   [Network.Polygon]:
     "0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000",
   [Network.Optimism]:
-    "0xcd0b087e113152324fca962488b4d9beb6f4caf6f100000000000000000000f1",
+    "0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000",
 };
 
 export const OpenseaConduit: ChainIdToAddress = {
   [Network.Ethereum]: "0x1e0049783f008a0085193e00003d00cd54003c71",
   [Network.EthereumGoerli]: "0x1e0049783f008a0085193e00003d00cd54003c71",
   [Network.Polygon]: "0x1e0049783f008a0085193e00003d00cd54003c71",
-  [Network.Optimism]: "0xFA29f9A402157672C2F608d193526A00C6B429Af",
+  [Network.Optimism]: "0x1e0049783f008a0085193e00003d00cd54003c71",
 };

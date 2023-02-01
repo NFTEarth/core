@@ -10,7 +10,7 @@ import RouterAbi from "../abis/ReservoirV6_0_0.json";
 import SeaportModuleAbi from "../abis/SeaportModule.json";
 
 export type Data = {
-  order: Sdk.Seaport.Types.OrderComponents;
+  order: Sdk.NFTEarth.Types.OrderComponents;
 };
 
 export type Item = {
@@ -45,22 +45,22 @@ export class Handler {
       startAmount: (token.amount ?? "1").toString(),
       endAmount: (token.amount ?? "1").toString(),
     }));
-    const order = new Sdk.Seaport.Order(this.chainId, {
+    const order = new Sdk.NFTEarth.Order(this.chainId, {
       kind: "single-token",
       offerer: giver,
-      zone: Sdk.Seaport.Addresses.ApprovalOrderZone[this.chainId],
+      zone: Sdk.NFTEarth.Addresses.ApprovalOrderZone[this.chainId],
       offer,
       consideration: offer.map((o, i) => ({
         ...o,
         recipient: items[i].receiver,
       })),
-      orderType: Sdk.Seaport.Types.OrderType.FULL_RESTRICTED,
+      orderType: Sdk.NFTEarth.Types.OrderType.FULL_RESTRICTED,
       startTime: now,
       endTime: now + expiresIn,
       zoneHash: HashZero,
       salt: getRandomBytes().toHexString(),
-      conduitKey: Sdk.Seaport.Addresses.OpenseaConduitKey[this.chainId],
-      counter: await new Sdk.Seaport.Exchange(this.chainId)
+      conduitKey: Sdk.NFTEarth.Addresses.NFTEarthConduitKey[this.chainId],
+      counter: await new Sdk.NFTEarth.Exchange(this.chainId)
         .getCounter(this.provider, giver)
         .then((c) => c.toString()),
     });
@@ -69,12 +69,12 @@ export class Handler {
   }
 
   public getSignatureData(data: Data) {
-    return new Sdk.Seaport.Order(this.chainId, data.order).getSignatureData();
+    return new Sdk.NFTEarth.Order(this.chainId, data.order).getSignatureData();
   }
 
   public attachAndCheckSignature(data: Data, signature: string) {
     data.order.signature = signature;
-    new Sdk.Seaport.Order(this.chainId, data.order).checkSignature();
+    new Sdk.NFTEarth.Order(this.chainId, data.order).checkSignature();
   }
 
   // Given an already encoded router execution, attach a list of permits to it
@@ -96,7 +96,7 @@ export class Handler {
       data: routerIface.encodeFunctionData("execute", [
         [
           {
-            module: Sdk.RouterV6.Addresses.SeaportModule[this.chainId],
+            module: Sdk.RouterV6.Addresses.NFTEarthModule[this.chainId],
             data: seaportModuleIface.encodeFunctionData("matchOrders", [
               [
                 ...data.map(({ order }) => ({

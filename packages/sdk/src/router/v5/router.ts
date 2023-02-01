@@ -108,30 +108,24 @@ export class Router {
       details
         .filter(({ kind }) => kind === "seaport-partial")
         .map(async (detail) => {
-          const order = detail.order as Sdk.NFTEarth.Types.PartialOrder;
+          const order = detail.order as Sdk.Seaport.Types.PartialOrder;
           const result = await axios.get(
             `https://order-fetcher.vercel.app/api/listing?orderHash=${order.id}&contract=${order.contract}&tokenId=${order.tokenId}&taker=${taker}&chainId=${this.chainId}`
           );
 
-          const fullOrder = new Sdk.NFTEarth.Order(
+          const fullOrder = new Sdk.Seaport.Order(
             this.chainId,
             result.data.order
           );
           details.push({
             ...detail,
-            kind: "nftearth",
+            kind: "seaport",
             order: fullOrder,
           });
         })
     );
     details = details.filter(({ kind }) => kind !== "seaport-partial");
 
-    // If all orders are Seaport, then we fill on Seaport directly
-    // TODO: Once the modular router is implemented, a refactoring
-    // might be needed - to use the router-generated order instead
-    // of treating Seaport as a special case (this is not possible
-    // at the moment because the router has separate functions for
-    // filling ERC721 vs ERC1155).
     if (
       details.every(({ kind }) => kind === "nftearth") &&
       // TODO: Look into using tips for fees on top (only doable on Seaport)
@@ -153,6 +147,46 @@ export class Router {
         );
       } else {
         const orders = details.map((d) => d.order as Sdk.NFTEarth.Order);
+        return exchange.fillOrdersTx(
+          taker,
+          orders,
+          orders.map((order, i) =>
+            order.buildMatching({ amount: details[i].amount })
+          ),
+          {
+            ...options,
+            ...options?.directFillingData,
+          }
+        );
+      }
+    }
+    // If all orders are Seaport, then we fill on Seaport directly
+    // TODO: Once the modular router is implemented, a refactoring
+    // might be needed - to use the router-generated order instead
+    // of treating Seaport as a special case (this is not possible
+    // at the moment because the router has separate functions for
+    // filling ERC721 vs ERC1155).
+    if (
+      details.every(({ kind }) => kind === "seaport") &&
+      // TODO: Look into using tips for fees on top (only doable on Seaport)
+      (!options?.fee || Number(options.fee.bps) === 0) &&
+      // Skip direct filling if disabled via the options
+      !options?.forceRouter
+    ) {
+      const exchange = new Sdk.Seaport.Exchange(this.chainId);
+      if (details.length === 1) {
+        const order = details[0].order as Sdk.Seaport.Order;
+        return exchange.fillOrderTx(
+          taker,
+          order,
+          order.buildMatching({ amount: details[0].amount }),
+          {
+            ...options,
+            ...options?.directFillingData,
+          }
+        );
+      } else {
+        const orders = details.map((d) => d.order as Sdk.Seaport.Order);
         return exchange.fillOrdersTx(
           taker,
           orders,
